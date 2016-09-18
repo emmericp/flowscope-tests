@@ -4,13 +4,15 @@ local device = require "device"
 local stats  = require "stats"
 local log    = require "log"
 local timer  = require "timer"
+local ffi    = require "ffi"
 
 function configure(parser)
 	parser:description([[
-		Sends a lot of random background traffic from/to 10.0.0.0/16 on UDP ports 1000-1000.
-		One of the flows sends a single packet to destination port 60000 after a configurable delay.
+		Sends a lot of random background traffic from/to 10.0.0.0/16 on UDP ports 1000-10000.
+		One of the flows sends a single packet to destination port 60000 after a configurable delay with the string "EXAMPLE" in the payload.
 		Use this trigger to retroactively dump all activity of this whole flow while ignoring all of the background traffic:
 		"udp dst 60000"
+		Alternatively, you can use filter-examples/trigger-payload.lua in FlowScope as a code trigger.
 	]])
     parser:argument("dev", "Devices to use."):args("+"):convert(tonumber)
 	parser:option("-r --rate", "Background traffic in Mbit/s."):default(10000):convert(tonumber)
@@ -78,10 +80,12 @@ function triggerTraffic(queue, size, timeout)
 			pkt.udp:setSrcPort(ctr)
 			if magicPacketDelay:expired() then
 				pkt.udp:setDstPort(60000)
+				ffi.copy(pkt.payload.uint8, "EXAMPLExx")
 				magicPacketDelay:reset(math.huge) -- just one trigger packet, but the flow continues
 				log:info("Sending trigger packet")
 			else
 				pkt.udp:setDstPort(math.random(1000, 10000))
+				ffi.copy(pkt.payload.uint8, "xxxxxxxx")
 			end
 			ctr = ctr + 1
 		end
